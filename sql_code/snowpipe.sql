@@ -58,8 +58,6 @@ Each notification must send to the Snowflake-provided ARN from your storage inte
 
 */
 
-
-
 /*
 
 If you just want to test loading manually (without waiting for S3 events):

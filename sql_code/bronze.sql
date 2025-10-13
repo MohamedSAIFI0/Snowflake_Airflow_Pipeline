@@ -4,6 +4,7 @@ CREATE OR REPLACE WAREHOUSE eccomerce_wh
   AUTO_SUSPEND = 300
   AUTO_RESUME = TRUE;
 
+  
 -- Use the warehouse
 USE WAREHOUSE bronze_wh;
 

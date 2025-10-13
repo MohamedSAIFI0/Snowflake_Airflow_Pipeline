@@ -9,7 +9,6 @@ FROM eccomerce_db.silver.sales_enriched s
 JOIN eccomerce_db.silver.customers_clean c ON s.customer_id = c.customer_id
 GROUP BY c.country;
 
-
 --Top Products
 CREATE OR REPLACE TABLE eccomerce_db.gold.top_products AS
 SELECT 
