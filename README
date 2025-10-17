@@ -1,4 +1,4 @@
-# Ecommerce Data Pipeline Project
+### Ecommerce Data Pipeline Project
 
 ## Overview
 This project implements a modern data pipeline for an ecommerce platform, leveraging AWS S3 for data storage and Snowflake for data warehousing. The pipeline ingests raw data (CSV, JSON), stages it in S3, and loads it into Snowflake using Snowpipe for automated, scalable data ingestion. The data is then processed through Bronze, Silver, and Gold layers for analytics and reporting.
