@@ -16,11 +16,9 @@ import pandas as pd
 import random
 import logging
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Default arguments
 default_args = {
     "owner": "Mohamed_SAIFI",
     "depends_on_past": False,
@@ -160,19 +158,19 @@ def data_quality_check(**context):
 
     checks = {
         "customers_null_check": """
-            SELECT COUNT(*) 
+            SELECT COUNT(*)
             FROM ecommerce_db.silver.customers_clean
             WHERE customer_id IS NULL OR email IS NULL
         """,
         "products_price_check": """
-            SELECT COUNT(*) 
+            SELECT COUNT(*)
             FROM ecommerce_db.silver.products_clean
             WHERE price <= 0
         """,
         "sales_orphan_check": """
             SELECT COUNT(*)
             FROM ecommerce_db.raw.sales s
-            LEFT JOIN ecommerce_db.raw.customers c 
+            LEFT JOIN ecommerce_db.raw.customers c
             ON s.customer_id = c.customer_id
             WHERE c.customer_id IS NULL
         """,
@@ -254,11 +252,12 @@ upload_s3_task = PythonOperator(
     dag=dag,
 )
 
+def _wait_for_snowpipe(**context):
+    logger.info("Waiting for Snowpipe to process files")
+
 wait_for_snowpipe = PythonOperator(
     task_id="wait_for_snowpipe",
-    python_callable=lambda: logger.info(
-        "Waiting for Snowpipe to process files"
-    ),
+    python_callable=_wait_for_snowpipe,
     dag=dag,
 )
 
@@ -280,9 +279,9 @@ transform_to_silver = SnowflakeOperator(
         CREATE OR REPLACE TABLE ecommerce_db.silver.customers_clean AS
         SELECT DISTINCT
             customer_id,
-            INITCAP(TRIM(name)) AS name,
-            UPPER(TRIM(country)) AS country,
-            LOWER(TRIM(email)) AS email
+            INITCAP(TRIM(name))   AS name,
+            UPPER(TRIM(country))  AS country,
+            LOWER(TRIM(email))    AS email
         FROM ecommerce_db.raw.customers
         WHERE customer_id IS NOT NULL
           AND email IS NOT NULL;
@@ -290,30 +289,29 @@ transform_to_silver = SnowflakeOperator(
         CREATE OR REPLACE TABLE ecommerce_db.silver.products_clean AS
         SELECT DISTINCT
             product_id,
-            INITCAP(TRIM(name)) AS name,
+            INITCAP(TRIM(name))     AS name,
             INITCAP(TRIM(category)) AS category,
-            ROUND(price, 2) AS price
+            ROUND(price, 2)         AS price
         FROM ecommerce_db.raw.products
         WHERE product_id IS NOT NULL
           AND price > 0;
 
+    
         CREATE OR REPLACE TABLE ecommerce_db.silver.sales_enriched AS
         SELECT
             s.sale_id,
             s.sale_date,
             c.customer_id,
-            c.name AS customer_name,
+            c.name     AS customer_name,
             c.country,
             p.product_id,
-            p.name AS product_name,
+            p.name     AS product_name,
             p.category,
             s.quantity,
             s.quantity * p.price AS total_amount
         FROM ecommerce_db.raw.sales s
-        JOIN ecommerce_db.silver.customers_clean c 
-        ON s.customer_id = c.customer_id
-        JOIN ecommerce_db.silver.products_clean p 
-        ON s.product_id = p.product_id
+        JOIN ecommerce_db.silver.customers_clean c ON s.customer_id = c.customer_id
+        JOIN ecommerce_db.silver.products_clean  p ON s.product_id  = p.product_id
         WHERE s.sale_id IS NOT NULL;
     """,
     dag=dag,
@@ -332,23 +330,21 @@ create_gold_layer = SnowflakeOperator(
         CREATE OR REPLACE TABLE ecommerce_db.gold.sales_by_country AS
         SELECT
             c.country,
-            SUM(s.total_amount) AS total_sales,
-            COUNT(DISTINCT s.sale_id) AS number_of_sales,
+            SUM(s.total_amount)           AS total_sales,
+            COUNT(DISTINCT s.sale_id)     AS number_of_sales,
             COUNT(DISTINCT c.customer_id) AS number_of_customers
-        FROM ecommerce_db.silver.sales_enriched s
-        JOIN ecommerce_db.silver.customers_clean c
-        ON s.customer_id = c.customer_id
+        FROM ecommerce_db.silver.sales_enriched  s
+        JOIN ecommerce_db.silver.customers_clean c ON s.customer_id = c.customer_id
         GROUP BY c.country;
 
         CREATE OR REPLACE TABLE ecommerce_db.gold.top_products AS
         SELECT
             p.name,
             p.category,
-            SUM(s.quantity) AS total_quantity_sold,
+            SUM(s.quantity)     AS total_quantity_sold,
             SUM(s.total_amount) AS total_revenue
         FROM ecommerce_db.silver.sales_enriched s
-        JOIN ecommerce_db.silver.products_clean p
-        ON s.product_id = p.product_id
+        JOIN ecommerce_db.silver.products_clean p ON s.product_id = p.product_id
         GROUP BY p.name, p.category
         ORDER BY total_revenue DESC;
 
@@ -357,12 +353,11 @@ create_gold_layer = SnowflakeOperator(
             c.customer_id,
             c.name,
             c.country,
-            COUNT(s.sale_id) AS number_of_purchases,
+            COUNT(s.sale_id)    AS number_of_purchases,
             SUM(s.total_amount) AS total_spent,
-            MAX(s.sale_date) AS last_purchase_date
-        FROM ecommerce_db.silver.sales_enriched s
-        JOIN ecommerce_db.silver.customers_clean c
-        ON s.customer_id = c.customer_id
+            MAX(s.sale_date)    AS last_purchase_date
+        FROM ecommerce_db.silver.sales_enriched  s
+        JOIN ecommerce_db.silver.customers_clean c ON s.customer_id = c.customer_id
         GROUP BY c.customer_id, c.name, c.country;
     """,
     dag=dag,
